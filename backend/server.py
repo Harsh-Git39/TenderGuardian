@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException
+from fastapi import FastAPI, APIRouter, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -11,9 +11,11 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 import base64
+import asyncio
 
 from encryption_utils import encrypt_file_content, generate_sha3_512_hash, generate_sha256_hash
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from automation import AutomationEngine
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -23,8 +25,11 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# Initialize automation engine
+automation = AutomationEngine(db)
+
+# Create the main app
+app = FastAPI(title="AI Tender Guardian", description="Autonomous Procurement System")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
@@ -46,6 +51,7 @@ class SealBidResponse(BaseModel):
     bidHash: str
     message: str
     bidderId: str
+    automated: bool = True
 
 class ComplianceCheckRequest(BaseModel):
     tenderRequirements: str
@@ -55,6 +61,13 @@ class ComplianceCheckResponse(BaseModel):
     success: bool
     analysis: str
     violations: List[str]
+
+class TenderCreate(BaseModel):
+    tenderId: str
+    description: str
+    budget: Optional[float] = None
+    deadline: Optional[str] = None
+    requirements: str
 
 class TenderUpdate(BaseModel):
     tenderId: str
@@ -75,16 +88,29 @@ class AuditLogEntry(BaseModel):
     bidderId: str
     status: str
 
+class AutomationStats(BaseModel):
+    total_bids: int
+    total_tenders: int
+    automation_events: int
+    last_24h_bids: int
+
 # Routes
 @api_router.get("/")
 async def root():
-    return {"message": "AI Tender Guardian API", "version": "1.0"}
+    return {
+        "message": "AI Tender Guardian - Autonomous Procurement System",
+        "version": "2.0",
+        "features": ["Auto-Notifications", "Auto-Compliance", "Smart Analytics"],
+        "automation": "Built-in (No external tools required)"
+    }
 
-@api_router.post("/seal-bid", response_model=SealBidResponse)
+@api_router.post("/seal", response_model=SealBidResponse)
 async def seal_bid(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     tender_id: str = File(...)
 ):
+    """Seal a bid with automatic notifications"""
     try:
         # Read file content
         file_content = await file.read()
@@ -98,7 +124,7 @@ async def seal_bid(
         # Generate unique bidder ID
         bidder_id = str(uuid.uuid4())
         
-        # Store metadata in database (NOT the file itself)
+        # Store metadata in database
         timestamp = datetime.now(timezone.utc).isoformat()
         
         sealed_bid = {
@@ -113,18 +139,28 @@ async def seal_bid(
         
         await db.bids.insert_one(sealed_bid)
         
+        # AUTO: Send notification in background
+        background_tasks.add_task(
+            automation.notify_bid_sealed,
+            tender_id,
+            bidder_id,
+            bid_hash
+        )
+        
         return SealBidResponse(
             success=True,
             bidHash=bid_hash,
-            message="Bid sealed successfully with AES-256 encryption",
-            bidderId=bidder_id
+            message="Bid sealed with AES-256 encryption. Notification sent.",
+            bidderId=bidder_id,
+            automated=True
         )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to seal bid: {str(e)}")
 
-@api_router.post("/check-compliance", response_model=ComplianceCheckResponse)
+@api_router.post("/compliance", response_model=ComplianceCheckResponse)
 async def check_compliance(request: ComplianceCheckRequest):
+    """AI-powered compliance checking"""
     try:
         # Initialize Gemini chat with Emergent LLM key
         api_key = os.environ.get('EMERGENT_LLM_KEY')
@@ -134,19 +170,19 @@ async def check_compliance(request: ComplianceCheckRequest):
         chat = LlmChat(
             api_key=api_key,
             session_id=f"compliance-{uuid.uuid4()}",
-            system_message="You are a procurement compliance assistant. Analyze tender requirements and bid summaries for compliance violations."
+            system_message="You are an AI procurement compliance assistant. Analyze requirements and identify violations precisely."
         ).with_model("gemini", "gemini-3-flash-preview")
         
         # Create compliance check prompt
-        prompt = f"""You are a procurement compliance assistant.
+        prompt = f"""Analyze this bid for compliance:
 
-Tender requirements:
+TENDER REQUIREMENTS:
 {request.tenderRequirements}
 
-Bid summary:
+BID SUMMARY:
 {request.bidSummary}
 
-Analyze the bid against tender requirements and list any violations or missing requirements in bullet points. Be specific and concise."""
+Provide concise analysis and list violations as bullet points (use - or •). If compliant, state "No violations detected"."""
         
         user_message = UserMessage(text=prompt)
         response = await chat.send_message(user_message)
@@ -170,37 +206,53 @@ Analyze the bid against tender requirements and list any violations or missing r
         logging.error(f"Compliance check failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Compliance check failed: {str(e)}")
 
-@api_router.post("/tender-update", response_model=TenderUpdateResponse)
-async def tender_update(update: TenderUpdate):
-    """n8n webhook endpoint for governance triggers"""
+@api_router.post("/tender", response_model=TenderUpdateResponse)
+async def create_tender(
+    background_tasks: BackgroundTasks,
+    tender: TenderCreate
+):
+    """Create new tender with automatic workflow"""
     try:
-        # Generate SHA-256 hash of the update
-        update_content = f"{update.tenderId}:{update.updateContent}:{update.updatedBy}"
-        update_hash = generate_sha256_hash(update_content)
+        # Generate SHA-256 hash of the tender
+        tender_content = f"{tender.tenderId}:{tender.description}:{tender.requirements}"
+        tender_hash = generate_sha256_hash(tender_content)
         
         timestamp = datetime.now(timezone.utc).isoformat()
         
         # Store in tender_updates collection
-        tender_update_doc = {
-            "tenderId": update.tenderId,
-            "updateContent": update.updateContent,
-            "updatedBy": update.updatedBy,
-            "updateHash": update_hash,
-            "timestamp": timestamp
+        tender_doc = {
+            "tenderId": tender.tenderId,
+            "description": tender.description,
+            "budget": tender.budget,
+            "deadline": tender.deadline,
+            "requirements": tender.requirements,
+            "updateContent": f"Tender created: {tender.description}. Requirements: {tender.requirements}",
+            "updatedBy": "system",
+            "updateHash": tender_hash,
+            "timestamp": timestamp,
+            "status": "OPEN"
         }
         
-        await db.tender_updates.insert_one(tender_update_doc)
+        await db.tender_updates.insert_one(tender_doc)
+        
+        # AUTO: Log automation event
+        background_tasks.add_task(
+            automation.log_automation_event,
+            tender.tenderId,
+            "TENDER_CREATED",
+            {"description": tender.description, "hash": tender_hash}
+        )
         
         return TenderUpdateResponse(
             success=True,
-            updateHash=update_hash,
+            updateHash=tender_hash,
             timestamp=timestamp
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to log tender update: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create tender: {str(e)}")
 
-@api_router.get("/audit-log", response_model=List[AuditLogEntry])
+@api_router.get("/audit", response_model=List[AuditLogEntry])
 async def get_audit_log():
     """Retrieve immutable audit log of all sealed bids"""
     try:
@@ -214,6 +266,29 @@ async def get_audit_log():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit log: {str(e)}")
+
+@api_router.get("/stats", response_model=AutomationStats)
+async def get_automation_stats():
+    """Get system automation statistics"""
+    try:
+        total_bids = await db.bids.count_documents({})
+        total_tenders = await db.tender_updates.count_documents({})
+        automation_events = await db.automation_events.count_documents({})
+        
+        # Count last 24h bids
+        yesterday = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        last_24h_bids = await db.bids.count_documents({
+            "timestamp": {"$gte": yesterday}
+        })
+        
+        return AutomationStats(
+            total_bids=total_bids,
+            total_tenders=total_tenders,
+            automation_events=automation_events,
+            last_24h_bids=last_24h_bids
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -232,6 +307,12 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 AI Tender Guardian started - Autonomous mode enabled")
+    # Start background automation tasks
+    asyncio.create_task(automation.generate_daily_report())
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

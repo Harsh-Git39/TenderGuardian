@@ -56,7 +56,7 @@ export default function AuditLog() {
           AUDIT LOG
         </h1>
         <p className="page-description">
-          Immutable cryptographic record | Tamper-proof transparency | Complete chain of custody
+          Powered by QuadForge
         </p>
       </div>
 

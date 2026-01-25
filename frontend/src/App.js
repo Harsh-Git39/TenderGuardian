@@ -62,7 +62,7 @@ function HomePage() {
           Autonomous Procurement System
         </p>
         <p style={{ fontSize: '1.1rem', color: 'var(--text-muted)', maxWidth: '800px', margin: '0 auto', lineHeight: '1.8' }}>
-          Military-grade encryption • AI compliance detection • Immutable audit trail • Zero external dependencies
+          Powered by QuadForge
         </p>
       </div>
 

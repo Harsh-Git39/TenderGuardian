@@ -103,7 +103,7 @@ export default function ComplianceCheck() {
           AI COMPLIANCE
         </h1>
         <p className="page-description">
-          Google Gemini 3 Flash | Real-time violation detection | Sub-second analysis
+          Powered by QuadForge
         </p>
       </div>
 

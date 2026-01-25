@@ -108,9 +108,10 @@ async def root():
 async def seal_bid(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    tender_id: str = File(...)
+    tender_id: str = File(...),
+    bid_summary: str = File(...)
 ):
-    """Seal a bid with automatic notifications"""
+    """Seal a bid with automatic notifications and compliance summary"""
     try:
         # Read file content
         file_content = await file.read()
@@ -133,6 +134,7 @@ async def seal_bid(
             "timestamp": timestamp,
             "bidderId": bidder_id,
             "status": "SEALED",
+            "bidSummary": bid_summary,
             "encryptedFileBase64": base64.b64encode(encrypted_content).decode('utf-8'),
             "iv": base64.b64encode(iv).decode('utf-8')
         }

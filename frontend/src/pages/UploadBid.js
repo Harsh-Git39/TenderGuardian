@@ -91,7 +91,7 @@ export default function UploadBid() {
           BID ENCRYPTION
         </h1>
         <p className="page-description">
-          Military-grade AES-256 encryption + SHA-3-512 hashing | Autonomous notification system
+          Powered by QuadForge
         </p>
       </div>
 

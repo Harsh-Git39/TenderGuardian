@@ -1,16 +1,18 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
-import { Lock, Brain, Database, Home, Shield, Zap } from "lucide-react";
+import { Lock, Brain, Database, Home, Shield, Plus } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import UploadBid from "@/pages/UploadBid";
 import ComplianceCheck from "@/pages/ComplianceCheck";
 import AuditLog from "@/pages/AuditLog";
+import CreateTender from "@/pages/CreateTender";
 
 function Navigation() {
   const location = useLocation();
   
   const navItems = [
     { path: '/', icon: Home, label: 'HOME' },
+    { path: '/create', icon: Plus, label: 'CREATE' },
     { path: '/upload', icon: Lock, label: 'SEAL' },
     { path: '/check', icon: Brain, label: 'COMPLIANCE' },
     { path: '/audit', icon: Database, label: 'AUDIT' }
@@ -64,7 +66,15 @@ function HomePage() {
         </p>
       </div>
 
-      <div className="home-grid">
+      <div className="home-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+        <Link to="/create" data-testid="home-create-card" className="home-card">
+          <Plus className="home-card-icon" size={48} />
+          <h3 className="home-card-title">CREATE TENDER</h3>
+          <p className="home-card-description">
+            Define requirements and compliance criteria for procurement process.
+          </p>
+        </Link>
+
         <Link to="/upload" data-testid="home-upload-card" className="home-card">
           <Lock className="home-card-icon" size={48} />
           <h3 className="home-card-title">BID ENCRYPTION</h3>
@@ -92,21 +102,25 @@ function HomePage() {
 
       <div className="card" style={{ marginTop: '4rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
-          <Zap style={{ color: 'var(--accent-green)' }} size={32} />
-          <h2 className="card-title">AUTONOMOUS FEATURES</h2>
+          <Shield style={{ color: 'var(--accent-green)' }} size={32} />
+          <h2 className="card-title">COMPLETE WORKFLOW</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
           <div>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AUTO-NOTIFICATIONS</h4>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Instant email alerts on bid sealing with cryptographic proof</p>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>1. CREATE</h4>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Tender creator defines requirements and compliance criteria</p>
           </div>
           <div>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AUTO-COMPLIANCE</h4>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Scheduled batch compliance checks after tender deadlines</p>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>2. SEAL</h4>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Bidders submit encrypted bids with summary for compliance</p>
           </div>
           <div>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AUTO-REPORTS</h4>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Daily analytics and activity summaries generated automatically</p>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>3. VERIFY</h4>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>AI automatically checks compliance against tender requirements</p>
+          </div>
+          <div>
+            <h4 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.5rem', color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>4. AUDIT</h4>
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>Complete immutable record with cryptographic proof</p>
           </div>
         </div>
       </div>
@@ -122,6 +136,7 @@ function App() {
         <Toaster position="top-right" theme="dark" />
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/create" element={<CreateTender />} />
           <Route path="/upload" element={<UploadBid />} />
           <Route path="/check" element={<ComplianceCheck />} />
           <Route path="/audit" element={<AuditLog />} />

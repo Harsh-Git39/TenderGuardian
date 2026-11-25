@@ -69,7 +69,7 @@ While this MVP uses FastAPI + MongoDB for rapid development, you can integrate F
 MONGO_URL="mongodb://localhost:27017"
 DB_NAME="test_database"
 CORS_ORIGINS="*"
-EMERGENT_LLM_KEY=sk-emergent-1A8F55f96Fd501e86F
+EMERGENT_LLM_KEY=---
 ENCRYPTION_KEY=your_32_byte_encryption_key_here_123456
 ```
 
